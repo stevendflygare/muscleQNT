@@ -110,6 +110,9 @@ def create_histogram(mice_hash,hist_name,rf,hb,user_bins,xlabel,ylabel,conversio
 	width = 0.35       # the width of the bars
 	rects1 = plt.bar(ind, wt_hist, width, color='b', yerr=wt_std, error_kw=dict(elinewidth=4, ecolor='green'))
 	rects2 = plt.bar(ind+width, mt_hist, width, color='r', yerr=mt_std, error_kw=dict(elinewidth=4, ecolor='pink'))
+	a = list(wt_hist)
+	a.extend(mt_hist)
+	plt.ylim([0, max(a)])
 	tick_vals = []
 	print "\nbins start and end pixel values: "
 	for i in range(len(bins)):
