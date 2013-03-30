@@ -42,21 +42,12 @@ def load_fiber_sizes(fiber_file,mice_hash):
 			sys.exit(0)
 	f.close()
 
-def create_histogram(mice_hash,hist_name,rf,hb,user_bins,xlabel,ylabel,conversion):
-	#do permutations to get all possibilities and then let the final histogram be the average
+def compute_ks_test(mice_hash):
 	image_names = []
-	mt_histograms = []
-	wt_histograms = []
-	p_index = 0
-	bins = []
-	if user_bins:
-		bins = map(int,re.split(",",user_bins))
-		hb = len(bins)-1
 	for k in mice_hash:
 		image_names.append([])
 		for im in mice_hash[k][1]:
 			image_names[-1].append((k,im))
-	print image_names
 	for p in itertools.product(*image_names):	
 		mutant = []
 		wild_type = []
@@ -65,41 +56,14 @@ def create_histogram(mice_hash,hist_name,rf,hb,user_bins,xlabel,ylabel,conversio
 			if mice_hash[i[0]][2] == 0:
 				wild_type.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
 			else:
-				mutant.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])				
-		if p_index == 0:
-			p_index+=1
-			wt_hist, tmpbins = np.histogram(wild_type,hb)
-			if not bins:
-				bins = tmpbins[:]
-			if rf:
-				wt_relfreq = wt_hist/float(sum(wt_hist))
-				wt_histograms.append(wt_relfreq)
-			else:
-				wt_histograms.append(wt_hist)
-			
-			mt_hist, tmpbins = np.histogram(mutant,bins)
-			if rf:
-				mt_relfreq = mt_hist/float(sum(mt_hist))
-				mt_histograms.append(mt_relfreq)
-			else:
-				mt_histograms.append(mt_hist)
-		else:
-			wt_hist, tmpbins = np.histogram(wild_type,bins)
-			if rf:
-				wt_relfreq = wt_hist/float(sum(wt_hist))
-				wt_histograms.append(wt_relfreq)
-			else:
-				wt_histograms.append(wt_hist)
-			
-			mt_hist, tmpbins = np.histogram(mutant,bins)
-			if rf:
-				mt_relfreq = mt_hist/float(sum(mt_hist))
-				mt_histograms.append(mt_relfreq)			
-			else:
-				mt_histograms.append(mt_hist)
-	
-	#print np.matrix(wt_histograms)
-			
+				mutant.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
+		ks_stat, p_value =  ss.ks_2samp(wild_type, mutant)
+		if p_value > .05:
+			print ks_stat, p_value
+			print p				
+
+
+def show_histogram(wt_histograms, mt_histograms, bins):
 	wt_hist = np.mean(wt_histograms,axis=0)
 	wt_std = np.std(wt_histograms,axis=0)
 	mt_hist = np.mean(mt_histograms,axis=0)
@@ -113,15 +77,16 @@ def create_histogram(mice_hash,hist_name,rf,hb,user_bins,xlabel,ylabel,conversio
 	rects2 = plt.bar(ind+width, mt_hist, width, color='r', yerr=mt_std, error_kw=dict(elinewidth=4, ecolor='pink'))
 	a = list(wt_hist)
 	a.extend(mt_hist)
-	if not rf:
+	if not args.relative:
 		plt.ylim([0, int(max(a)*1.10)])
+	else:
+		plt.ylim([0, max(a)+.1])
 	tick_vals = []
 	print "\nbins start and end pixel values: "
 	for i in range(len(bins)):
 		tick_vals.append(i+1)
 		if i > 0:
-			print "\tbin "+str(i)+": "+str(bins[i-1])+"-"+str(bins[i])
-					
+			print "\tbin "+str(i)+": "+str(bins[i-1])+"-"+str(bins[i])				
 	#for i in range(len(bins)):
 	#	if i < len(bins)-1:
 	#		if not conversion:
@@ -131,13 +96,114 @@ def create_histogram(mice_hash,hist_name,rf,hb,user_bins,xlabel,ylabel,conversio
 	#			tick_vals.append(round(np.mean(bins[i:i+2])*conversion,2))
 	#plt.xticks(ind,tick_vals)
 	plt.xticks(ind+width,tick_vals)
-	plt.xlabel(xlabel)
+	plt.xlabel(args.xl)
 	
-	plt.ylabel(ylabel)
+	plt.ylabel(args.yl)
 	plt.legend( (rects1[0], rects2[0]), ('Wild Type', 'Mutant') )
 	plt.show()
 	#plt.savefig(hist_name)
-	plt.clf()
+	plt.clf()	
+
+
+def compile_rf_histogram(mice_hash,hist_name,hb,user_bins):
+	#do permutations to get all possibilities and then let the final histogram be the average
+	image_names = []
+	mt_histograms = []
+	wt_histograms = []
+	p_index = 0
+	bins = []
+	if user_bins:
+		bins = map(int,re.split(",",user_bins))
+		hb = len(bins)-1
+	for k in mice_hash:
+		image_names.append([])
+		for im in mice_hash[k][1]:
+			image_names[-1].append((k,im))
+	for p in itertools.product(*image_names):	
+		mutant = []
+		wild_type = []
+		#print p
+		for i in p:
+			if mice_hash[i[0]][2] == 0:
+				wild_type.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
+			else:
+				mutant.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
+		if p_index == 0:
+			p_index+=1
+			wt_hist, tmpbins = np.histogram(wild_type,hb)
+			if not bins:
+				bins = tmpbins[:]
+			wt_relfreq = wt_hist/float(sum(wt_hist))
+			wt_histograms.append(wt_relfreq)
+			mt_hist, tmpbins = np.histogram(mutant,bins)
+			mt_relfreq = mt_hist/float(sum(mt_hist))
+			mt_histograms.append(mt_relfreq)
+		else:
+			wt_hist, tmpbins = np.histogram(wild_type,bins)
+			wt_relfreq = wt_hist/float(sum(wt_hist))
+			wt_histograms.append(wt_relfreq)
+			mt_hist, tmpbins = np.histogram(mutant,bins)
+			mt_relfreq = mt_hist/float(sum(mt_hist))
+			mt_histograms.append(mt_relfreq)			
+	show_histogram(wt_histograms, mt_histograms, bins)
+	#print np.matrix(wt_histograms)
+
+def compile_count_histogram(mice_hash,hist_name,hb,user_bins):
+	#do permutations to get all possibilities and then let the final histogram be the average
+	image_names = []
+	mt_histograms = []
+	wt_histograms = []
+	p_index = 0
+	bins = []
+	if user_bins:
+		bins = map(int,re.split(",",user_bins))
+		hb = len(bins)-1
+	for k in mice_hash:
+		image_names.append([])
+		for im in mice_hash[k][1]:
+			image_names[-1].append((k,im))
+	#need to equalize number of fibers between groups, so find smallest number among all the groups
+	#and randomly select this number of fibers
+	counts = []
+	for p in itertools.product(*image_names):	
+		mutant = []
+		wild_type = []
+		#print p
+		for i in p:
+			if mice_hash[i[0]][2] == 0:
+				wild_type.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
+			else:
+				mutant.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
+		counts.append(len(mutant))
+		counts.append(len(wild_type))
+	
+	sample_size = min(counts)
+	print "number of fibers to sample from each collection of mutant/wild type: " + str(sample_size)
+	for p in itertools.product(*image_names):	
+		mutant = []
+		wild_type = []
+		#print p
+		for i in p:
+			if mice_hash[i[0]][2] == 0:
+				wild_type.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
+			else:
+				mutant.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])	
+		mutant = random.sample(mutant,sample_size)
+		wild_type = random.sample(wild_type,sample_size)
+		if p_index == 0:
+			p_index+=1
+			wt_hist, tmpbins = np.histogram(wild_type,hb)
+			if not bins:
+				bins = tmpbins[:]
+			wt_histograms.append(wt_hist)
+			mt_hist, tmpbins = np.histogram(mutant,bins)
+			mt_histograms.append(mt_hist)
+		else:
+			wt_hist, tmpbins = np.histogram(wild_type,bins)
+			wt_histograms.append(wt_hist)
+			mt_hist, tmpbins = np.histogram(mutant,bins)
+			mt_histograms.append(mt_hist)	
+	show_histogram(wt_histograms, mt_histograms, bins)		
 
 
 def create_decile_plot(mice_hash,plot_name):
@@ -189,7 +255,10 @@ for line in f:
 f.close()
 
 load_fiber_sizes(args.fiber_file,mice)
-create_histogram(mice,"fiber_histogram.svg",args.relative,args.hb,args.bin_sizes,args.xl,args.yl,args.conversion)
+if args.relative:
+	compile_rf_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
+else:
+	compile_count_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
 	
 #chi2, p, dof, ex = ss.chi2_contingency([wt_hist,mt_hist])
 #print "chi2 test p-value: " + str(p)
