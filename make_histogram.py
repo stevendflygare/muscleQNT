@@ -19,6 +19,7 @@ parser.add_argument("fiber_file", help="fiber size input file")
 parser.add_argument("image_metrics", help="image metrics input file")
 parser.add_argument("-c","--conversion",help="pixel to micro-meter conversion (multiplicative factor)",type=float)
 parser.add_argument("-rf","--relative",help="use relative frequency instead of raw counts in histogram",action="store_true")
+parser.add_argument("-ks",help="compute test statistic across mutant / wild type permutations",action="store_true")
 parser.add_argument("-bs","--bin_sizes",help="comma separated list of pixel break values for bins",type=str)
 parser.add_argument("-hb",help="number of histogram bins",type=int,default=20)
 parser.add_argument("-xl",help="x-axis label",type=str,default="")
@@ -48,6 +49,8 @@ def compute_ks_test(mice_hash):
 		image_names.append([])
 		for im in mice_hash[k][1]:
 			image_names[-1].append((k,im))
+	total_tests = 0
+	significant_tests = 0
 	for p in itertools.product(*image_names):	
 		mutant = []
 		wild_type = []
@@ -58,9 +61,14 @@ def compute_ks_test(mice_hash):
 			else:
 				mutant.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
 		ks_stat, p_value =  ss.ks_2samp(wild_type, mutant)
-		if p_value > .05:
-			print ks_stat, p_value
-			print p				
+		if p_value < .05:
+			significant_tests+=1
+		total_tests+=1		
+	
+	print "results of ks test:"
+	print "\t total permutations: " + str(total_tests)
+	print "\t number of significant tests (at alpha = .05): " + str(significant_tests)
+	print "\t proportion significant: " + str(float(significant_tests)/total_tests)		
 
 
 def show_histogram(wt_histograms, mt_histograms, bins):
@@ -255,6 +263,10 @@ for line in f:
 f.close()
 
 load_fiber_sizes(args.fiber_file,mice)
+
+if args.ks:
+	compute_ks_test(mice)
+
 if args.relative:
 	compile_rf_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
 else:
