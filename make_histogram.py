@@ -17,7 +17,7 @@ import itertools
 parser = argparse.ArgumentParser()
 parser.add_argument("fiber_file", help="fiber size input file")
 parser.add_argument("image_metrics", help="image metrics input file")
-parser.add_argument("-c","--conversion",help="pixel to micro-meter conversion (multiplicative factor)",type=float)
+parser.add_argument("-c","--conversion",help="pixel to micro-meter conversion (multiplicative factor)",type=float,default=1.0)
 parser.add_argument("-rf","--relative",help="use relative frequency instead of raw counts in histogram",action="store_true")
 parser.add_argument("-ks",help="compute test statistic across mutant / wild type permutations",action="store_true")
 parser.add_argument("-bs","--bin_sizes",help="comma separated list of pixel break values for bins",type=str)
@@ -94,7 +94,7 @@ def show_histogram(wt_histograms, mt_histograms, bins):
 	for i in range(len(bins)):
 		tick_vals.append(i+1)
 		if i > 0:
-			print "\tbin "+str(i)+": "+str(bins[i-1])+"-"+str(bins[i])				
+			print "\tbin "+str(i)+": "+str(bins[i-1]*args.conversion)+"-"+str(bins[i]*args.conversion)				
 	#for i in range(len(bins)):
 	#	if i < len(bins)-1:
 	#		if not conversion:
