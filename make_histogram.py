@@ -33,7 +33,10 @@ def load_fiber_sizes(fiber_file,mice_hash):
 		m = re.search("([0-9a-zA-Z]+)_([0-9a-zA-Z]+)_(\d+)\.",data[0])
 		if m:
 			if m.group(1) in mice_hash:
-				mice_hash[m.group(1)][0].append(map(int,data[1:]))
+				if len(data) == 0:
+					mice_hash[m.group(1)][0].append([10])
+				else:
+					mice_hash[m.group(1)][0].append(map(int,data[1:]))
 			else:
 				print "problem, mouse not found going to exit: " + m.group(1)
 				sys.exit(0)
@@ -81,8 +84,8 @@ def show_histogram(wt_histograms, mt_histograms, bins):
 	#use relative frequencies instead of the density
 	ind = np.arange(len(wt_hist))  # the x locations for the groups
 	width = 0.35       # the width of the bars
-	rects1 = plt.bar(ind, wt_hist, width, color='b', yerr=wt_std, error_kw=dict(elinewidth=4, ecolor='green'))
-	rects2 = plt.bar(ind+width, mt_hist, width, color='r', yerr=mt_std, error_kw=dict(elinewidth=4, ecolor='pink'))
+	rects1 = plt.bar(ind, wt_hist, width, color='b', yerr=wt_std, error_kw=dict(elinewidth=4, ecolor='black'))
+	rects2 = plt.bar(ind+width, mt_hist, width, color='r', yerr=mt_std, error_kw=dict(elinewidth=4, ecolor='black'))
 	a = list(wt_hist)
 	a.extend(mt_hist)
 	if not args.relative:
