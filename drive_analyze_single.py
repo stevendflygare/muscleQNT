@@ -74,6 +74,7 @@ if co_channel >= 0: #quantify slow fibers
 		co_pix.append(p[co_channel])
 	im_co = Image.new("L",im_rgb.size)
 	im_co.putdata(co_pix)
+	#im_co.show()
 	slow = analyze_slow(vis_pix, args, im_co, vis_rgb)	
 	#need to get just fast fibers (look for 1 in vis_pix)
 	fast_pix = vis_pix*(vis_pix == 1)
