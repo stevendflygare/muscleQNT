@@ -86,6 +86,20 @@ for tmp_img in images:
 	#quantify all fibers
 	vis_pix = np.zeros(im.size[0]*im.size[1],dtype=np.uint8)
 	all = analyze_all(vis_pix, args, im, vis_rgb)
+	main_structure_area = 0
+	if args.outline: #go through each column and add number of pixels between first and last non-zero terms
+		tmp_vis_pix = vis_pix.reshape(im.size[1],im.size[0])
+		for i in range(im.size[0]):
+			min = 0
+			max = 0
+			for j in range(im.size[1]):
+				if tmp_vis_pix[j,i] > 0:
+					if min == 0:
+						min = j
+					if j > max:
+						max = j
+			main_structure_area += (max - min)											
+	
 	slow = None
 	
 	if co_channel >= 0: #quantify slow fibers
@@ -117,8 +131,9 @@ for tmp_img in images:
 	mean_fiber = np.mean(fiber_sizes)
 	fiber_variance = np.var(fiber_sizes)
 	fiber_area = sum(fiber_sizes)
-	subtracted_area = 0
-	#subtracted_area = main_structure_area - fiber_area
+	subtracted_area = im.size[0]*im.size[1] - fiber_area
+	if main_structure_area > 0:
+		subtracted_area = main_structure_area - fiber_area
 	out_array = [tmp_img,str(fiber_number),str(mean_fiber),str(fiber_variance),str(fiber_area),str(subtracted_area),str(num_fast),str(num_slow)]
 	out.write(",".join(out_array)+"\n")
 	fs = [str(x) for x in fiber_sizes]

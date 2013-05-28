@@ -68,6 +68,21 @@ vis_pix = np.zeros(im.size[0]*im.size[1],dtype=np.uint8)
 all = analyze_all(vis_pix, args, im, vis_rgb)
 slow = None
 
+main_structure_area = 0
+if args.outline: #go through each column and add number of pixels between first and last non-zero terms
+	tmp_vis_pix = vis_pix.reshape(im.size[1],im.size[0])
+	for i in range(im.size[0]):
+		min = 0
+		max = 0
+		for j in range(im.size[1]):
+			if tmp_vis_pix[j,i] > 0:
+				if min == 0:
+					min = j
+				if j > max:
+					max = j
+		main_structure_area += (max - min)							
+
+
 if co_channel >= 0: #quantify slow fibers
 	co_pix = []
 	for p in rgb_pix:
@@ -101,12 +116,15 @@ fiber_number = len(fiber_sizes)
 mean_fiber = np.mean(fiber_sizes)
 fiber_variance = np.var(fiber_sizes)
 fiber_area = sum(fiber_sizes)
-subtracted_area = 0
-#subtracted_area = main_structure_area - fiber_area
+subtracted_area = im.size[0]*im.size[1] - fiber_area
+if main_structure_area > 0:
+	subtracted_area = main_structure_area - fiber_area
+	
 print "number of fibers: " + str(fiber_number)
 print "mean fiber size: " + str(mean_fiber)
 print "fiber size variance: " + str(fiber_variance)
 print "total fiber area: " + str(fiber_area)
+print "between fiber area: " + str(subtracted_area)
 
 print "time to process: " + str(time.time() - start)
 	
