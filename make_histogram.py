@@ -141,9 +141,10 @@ def compile_rf_histogram(mice_hash,hist_name,hb,user_bins):
 				mutant.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
 		if p_index == 0:
 			p_index+=1
-			wt_hist, tmpbins = np.histogram(wild_type,hb)
 			if not bins:
+				wt_hist, tmpbins = np.histogram(wild_type,hb)
 				bins = tmpbins[:]
+			wt_hist, tmpbins = np.histogram(wild_type,bins)			
 			wt_relfreq = wt_hist/float(sum(wt_hist))
 			wt_histograms.append(wt_relfreq)
 			mt_hist, tmpbins = np.histogram(mutant,bins)
@@ -203,9 +204,10 @@ def compile_count_histogram(mice_hash,hist_name,hb,user_bins):
 		wild_type = random.sample(wild_type,sample_size)
 		if p_index == 0:
 			p_index+=1
-			wt_hist, tmpbins = np.histogram(wild_type,hb)
 			if not bins:
+				wt_hist, tmpbins = np.histogram(wild_type,hb)
 				bins = tmpbins[:]
+			wt_hist, tmpbins = np.histogram(wild_type,bins)
 			wt_histograms.append(wt_hist)
 			mt_hist, tmpbins = np.histogram(mutant,bins)
 			mt_histograms.append(mt_hist)
