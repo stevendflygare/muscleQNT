@@ -19,6 +19,7 @@ parser.add_argument("fiber_file", help="fiber size input file")
 parser.add_argument("image_metrics", help="image metrics input file")
 parser.add_argument("-c","--conversion",help="pixel to micro-meter conversion (multiplicative factor)",type=float,default=1.0)
 parser.add_argument("-rf","--relative",help="use relative frequency instead of raw counts in histogram",action="store_true")
+parser.add_argument("-ntr","--no_replicates",help="flag if there are no technical replicates (only one image per mouse) to get error bars",action="store_true")
 parser.add_argument("-ks",help="compute test statistic across mutant / wild type permutations",action="store_true")
 parser.add_argument("-bs","--bin_sizes",help="comma separated list of pixel break values for bins",type=str)
 parser.add_argument("-hb",help="number of histogram bins",type=int,default=20)
@@ -74,7 +75,7 @@ def compute_ks_test(mice_hash):
 	print "\t proportion significant: " + str(float(significant_tests)/total_tests)		
 
 
-def show_histogram(wt_histograms, mt_histograms, bins):
+def show_histogram(wt_histograms, mt_histograms, bins):	
 	wt_hist = np.mean(wt_histograms,axis=0)
 	wt_std = np.std(wt_histograms,axis=0)
 	mt_hist = np.mean(mt_histograms,axis=0)
@@ -115,6 +116,58 @@ def show_histogram(wt_histograms, mt_histograms, bins):
 	#plt.savefig(hist_name)
 	plt.clf()	
 
+def no_replicates_histogram(mice_hash,hist_name,hb,user_bins):
+	#bootstrap mutant / wild type pooled fibers to get error bars
+	mt_histograms = []
+	wt_histograms = []
+	mutant = []
+	wild_type = []
+	bins = []
+	if user_bins:
+		bins = map(int,re.split(",",user_bins))
+		hb = len(bins)-1
+		
+	for m in mice_hash:
+		if mice_hash[m][2] == 0:
+			wild_type.extend(mice_hash[m][0][0])
+		else:
+			mutant.extend(mice_hash[m][0][0])
+	#select .5 of the population about 1000 times and compute histograms to get the error bars
+	sample_size = int(0.5*min(len(wild_type),len(mutant)))
+	for i in range(1000):
+		wt_sample = random.sample(wild_type,sample_size)
+		mt_sample = random.sample(mutant,sample_size)
+		if i == 0:
+			wt_hist, tmpbins = np.histogram(wt_sample,hb)
+			if not bins:
+				bins = tmpbins[:]
+			if args.relative:
+				wt_relfreq = wt_hist/float(sum(wt_hist))
+				wt_histograms.append(wt_relfreq)
+				mt_hist, tmpbins = np.histogram(mt_sample,bins)
+				mt_relfreq = mt_hist/float(sum(mt_hist))
+				mt_histograms.append(mt_relfreq)
+			else:
+				wt_histograms.append(wt_hist)
+				mt_hist, tmpbins = np.histogram(mt_sample,bins)
+				mt_histograms.append(mt_hist)
+		else:
+			if args.relative:
+				wt_hist, tmpbins = np.histogram(wt_sample,bins)
+				wt_relfreq = wt_hist/float(sum(wt_hist))
+				wt_histograms.append(wt_relfreq)
+				mt_hist, tmpbins = np.histogram(mt_sample,bins)
+				mt_relfreq = mt_hist/float(sum(mt_hist))
+				mt_histograms.append(mt_relfreq)
+			else:
+				wt_hist, tmpbins = np.histogram(wt_sample,bins)
+				wt_histograms.append(wt_hist)
+				mt_hist, tmpbins = np.histogram(mt_sample,bins)
+				mt_histograms.append(mt_hist)	
+							
+	show_histogram(wt_histograms, mt_histograms, bins)
+		
+
 
 def compile_rf_histogram(mice_hash,hist_name,hb,user_bins):
 	#do permutations to get all possibilities and then let the final histogram be the average
@@ -126,11 +179,17 @@ def compile_rf_histogram(mice_hash,hist_name,hb,user_bins):
 	if user_bins:
 		bins = map(int,re.split(",",user_bins))
 		hb = len(bins)-1
+	
 	for k in mice_hash:
 		image_names.append([])
 		for im in mice_hash[k][1]:
 			image_names[-1].append((k,im))
+	
+	iterations = 0			
 	for p in itertools.product(*image_names):	
+		iterations+=1
+		if iterations >= 500:
+			break
 		mutant = []
 		wild_type = []
 		#print p
@@ -177,7 +236,11 @@ def compile_count_histogram(mice_hash,hist_name,hb,user_bins):
 	#need to equalize number of fibers between groups, so find smallest number among all the groups
 	#and randomly select this number of fibers
 	counts = []
+	iterations = 0
 	for p in itertools.product(*image_names):	
+		iterations+=1
+		if iterations >= 500:
+			break
 		mutant = []
 		wild_type = []
 		#print p
@@ -191,7 +254,11 @@ def compile_count_histogram(mice_hash,hist_name,hb,user_bins):
 	
 	sample_size = min(counts)
 	print "number of fibers to sample from each collection of mutant/wild type: " + str(sample_size)
+	iterations = 0
 	for p in itertools.product(*image_names):	
+		iterations+=1
+		if iterations >= 500:
+			break
 		mutant = []
 		wild_type = []
 		#print p
@@ -200,8 +267,14 @@ def compile_count_histogram(mice_hash,hist_name,hb,user_bins):
 				wild_type.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])
 			else:
 				mutant.extend(mice_hash[i[0]][0][mice_hash[i[0]][1].index(i[1])])	
-		mutant = random.sample(mutant,sample_size)
-		wild_type = random.sample(wild_type,sample_size)
+		if sample_size > len(mutant) or sample_size > len(wild_type):
+			if mutant > wild_type:
+				mutant = random.sample(mutant,len(wild_type))
+			else:
+				wild_type = random.sample(wild_type,len(mutant))
+		else:
+			mutant = random.sample(mutant,sample_size)
+			wild_type = random.sample(wild_type,sample_size)
 		if p_index == 0:
 			p_index+=1
 			if not bins:
@@ -272,7 +345,9 @@ load_fiber_sizes(args.fiber_file,mice)
 if args.ks:
 	compute_ks_test(mice)
 
-if args.relative:
+if args.no_replicates:
+	no_replicates_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
+elif args.relative:
 	compile_rf_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
 else:
 	compile_count_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
