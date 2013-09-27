@@ -68,6 +68,7 @@ vis_pix = np.zeros(im.size[0]*im.size[1],dtype=np.uint8)
 all = analyze_all(vis_pix, args, im, vis_rgb)
 slow = None
 
+
 main_structure_area = 0
 if args.outline: #go through each column and add number of pixels between first and last non-zero terms
 	tmp_vis_pix = vis_pix.reshape(im.size[1],im.size[0])
