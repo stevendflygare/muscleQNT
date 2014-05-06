@@ -83,20 +83,57 @@ def random_permutation(mice):
 	num_mutant = 0
 	mutant_wildtype = [mice[x][2] for x in mice]  #{mouse}->[[fibers],[images],mutant/wildtype]
 	num_combinations = scipy.misc.comb(len(mice),sum(mutant_wildtype))
-	num_permutations = min(num_combinations,100)
+	num_permutations = min(num_combinations,500)
+	wt_hists = []
+	mt_hists = []
+	bins = []
 	for i in range(num_permutations):
-		m_copy = copy.deepcopy()
+		m_copy = copy.deepcopy(mice)
 		nr.shuffle(mutant_wildtype)
-		for m in m_copy:
-			m_copy[m]
-		print i
-		if args.no_replicates:
-			wt,mt,bins = no_replicates_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes,permutation=1)
-		elif args.relative:
-			wt,mt,bins = compile_rf_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes,permutation=1)
+		for j,m in enumerate(m_copy):
+			m_copy[m][2] = mutant_wildtype[j]
+		#print i
+		wt, mt, bins = permutation_calc(m_copy)
+		wt_hists.append(wt)
+		mt_hists.append(mt)
+	
+	show_histogram(wt_hists, mt_hists, bins)
+	
+def permutation_calc(mice_hash):
+	#bootstrap mutant / wild type pooled fibers to get error bars
+	mt_hist = []
+	wt_hist = []
+	mutant = []
+	wild_type = []
+	bins = []
+	if args.bin_sizes:
+		bins = map(int,re.split(",",args.bin_sizes))
+		hb = len(bins)-1
+	else:
+		print "must specify histogram bins if going to randomly permute mutant / wild type status (use -bs <bin list>)"
+		print "exiting..."
+		sys.exit(0)
+	
+	#randomly select technical replicates, if any, to use
+	for m in mice_hash:
+		if mice_hash[m][2] == 0:
+			wild_type.extend(random.sample(mice_hash[m][0],1)[0])
 		else:
-			wt,mt,bins = compile_count_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes,permutation=1)
-
+			mutant.extend(random.sample(mice_hash[m][0],1)[0])
+	sample_size = int(min(len(wild_type),len(mutant)))
+	wt_sample = random.sample(wild_type,sample_size)
+	mt_sample = random.sample(mutant,sample_size)
+	if args.relative:
+		wt_hist, tmpbins = np.histogram(wt_sample,bins)
+		wt_relfreq = wt_hist/float(sum(wt_hist))
+		mt_hist, tmpbins = np.histogram(mt_sample,bins)
+		mt_relfreq = mt_hist/float(sum(mt_hist))
+	else:
+		wt_hist, tmpbins = np.histogram(wt_sample,bins)
+		mt_hist, tmpbins = np.histogram(mt_sample,bins)
+	
+	return wt_hist, mt_hist, bins
+	
 
 def show_histogram(wt_histograms, mt_histograms, bins):	
 	wt_hist = np.mean(wt_histograms,axis=0)
@@ -388,7 +425,11 @@ if args.ks:
 	compute_ks_test(mice)
 
 if args.random_permute:
-	random_perumtation(mice)
+	if not args.bin_sizes:
+		print "must specify histogram bins if going to randomly permute mutant / wild type status (use -bs <bin list>)"
+		print "exiting..."
+		sys.exit(0)
+	random_permutation(mice)
 elif args.no_replicates:
 	no_replicates_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
 elif args.relative:
