@@ -2,9 +2,12 @@
 
 import sys
 import re
+import copy
 from PIL import Image
 import scipy.ndimage as si
+import scipy.misc
 import numpy as np
+import numpy.random as nr
 import random
 import scipy.stats as ss
 import argparse
@@ -25,6 +28,8 @@ parser.add_argument("-bs","--bin_sizes",help="comma separated list of pixel brea
 parser.add_argument("-hb",help="number of histogram bins",type=int,default=20)
 parser.add_argument("-xl",help="x-axis label",type=str,default="")
 parser.add_argument("-yl",help="y-axis label",type=str,default="")
+parser.add_argument("-ylim",help="y limit as start,end",type=str,default=None)
+parser.add_argument("-rp","--random_permute",help="flag to create background distribution",action="store_true")
 args = parser.parse_args()
 
 def load_fiber_sizes(fiber_file,mice_hash): 
@@ -74,6 +79,24 @@ def compute_ks_test(mice_hash):
 	print "\t number of significant tests (at alpha = .05): " + str(significant_tests)
 	print "\t proportion significant: " + str(float(significant_tests)/total_tests)		
 
+def random_permutation(mice):
+	num_mutant = 0
+	mutant_wildtype = [mice[x][2] for x in mice]  #{mouse}->[[fibers],[images],mutant/wildtype]
+	num_combinations = scipy.misc.comb(len(mice),sum(mutant_wildtype))
+	num_permutations = min(num_combinations,100)
+	for i in range(num_permutations):
+		m_copy = copy.deepcopy()
+		nr.shuffle(mutant_wildtype)
+		for m in m_copy:
+			m_copy[m]
+		print i
+		if args.no_replicates:
+			wt,mt,bins = no_replicates_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes,permutation=1)
+		elif args.relative:
+			wt,mt,bins = compile_rf_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes,permutation=1)
+		else:
+			wt,mt,bins = compile_count_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes,permutation=1)
+
 
 def show_histogram(wt_histograms, mt_histograms, bins):	
 	wt_hist = np.mean(wt_histograms,axis=0)
@@ -93,6 +116,10 @@ def show_histogram(wt_histograms, mt_histograms, bins):
 		plt.ylim([0, int(max(a)*1.10)])
 	else:
 		plt.ylim([0, max(a)+.1])
+	
+	if args.ylim != None: #control over y-axis
+		plt.ylim(args.ylim)
+		
 	tick_vals = []
 	print "\nbins start and end pixel values: "
 	for i in range(len(bins)):
@@ -116,7 +143,7 @@ def show_histogram(wt_histograms, mt_histograms, bins):
 	#plt.savefig(hist_name)
 	plt.clf()	
 
-def no_replicates_histogram(mice_hash,hist_name,hb,user_bins):
+def no_replicates_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
 	#bootstrap mutant / wild type pooled fibers to get error bars
 	mt_histograms = []
 	wt_histograms = []
@@ -164,12 +191,14 @@ def no_replicates_histogram(mice_hash,hist_name,hb,user_bins):
 				wt_histograms.append(wt_hist)
 				mt_hist, tmpbins = np.histogram(mt_sample,bins)
 				mt_histograms.append(mt_hist)	
-							
+	
+	if permutation == 1:
+		return wt_histograms, mt_histograms, bins  						
 	show_histogram(wt_histograms, mt_histograms, bins)
 		
 
 
-def compile_rf_histogram(mice_hash,hist_name,hb,user_bins):
+def compile_rf_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
 	#do permutations to get all possibilities and then let the final histogram be the average
 	image_names = []
 	mt_histograms = []
@@ -215,11 +244,14 @@ def compile_rf_histogram(mice_hash,hist_name,hb,user_bins):
 			wt_histograms.append(wt_relfreq)
 			mt_hist, tmpbins = np.histogram(mutant,bins)
 			mt_relfreq = mt_hist/float(sum(mt_hist))
-			mt_histograms.append(mt_relfreq)			
+			mt_histograms.append(mt_relfreq)
+	
+	if permutation == 1:
+		return wt_histograms, mt_histograms, bins 			
 	show_histogram(wt_histograms, mt_histograms, bins)
 	#print np.matrix(wt_histograms)
 
-def compile_count_histogram(mice_hash,hist_name,hb,user_bins):
+def compile_count_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
 	#do permutations to get all possibilities and then let the final histogram be the average
 	image_names = []
 	mt_histograms = []
@@ -289,6 +321,8 @@ def compile_count_histogram(mice_hash,hist_name,hb,user_bins):
 			wt_histograms.append(wt_hist)
 			mt_hist, tmpbins = np.histogram(mutant,bins)
 			mt_histograms.append(mt_hist)	
+	if permutation == 1:
+		return wt_histograms, mt_histograms, bins
 	show_histogram(wt_histograms, mt_histograms, bins)		
 
 
@@ -341,11 +375,21 @@ for line in f:
 f.close()
 
 load_fiber_sizes(args.fiber_file,mice)
+if args.ylim != None:
+	m = re.match("([0-9]+),([0-9]+)",args.ylim)
+	if m:
+		args.ylim = (int(m.group(1)),int(m.group(2)))
+	else:
+		print "problem, y limits need to be specified as <start>,<stop>"
+		print "exiting..."
+		sys.exit(0)
 
 if args.ks:
 	compute_ks_test(mice)
 
-if args.no_replicates:
+if args.random_permute:
+	random_perumtation(mice)
+elif args.no_replicates:
 	no_replicates_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
 elif args.relative:
 	compile_rf_histogram(mice,"fiber_histogram.svg",args.hb,args.bin_sizes)
