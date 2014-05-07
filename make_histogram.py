@@ -132,6 +132,9 @@ def permutation_calc(mice_hash):
 		wt_hist, tmpbins = np.histogram(wt_sample,bins)
 		mt_hist, tmpbins = np.histogram(mt_sample,bins)
 	
+	if args.relative:
+		return wt_relfreq, mt_relfreq, bins
+		
 	return wt_hist, mt_hist, bins
 	
 
@@ -413,9 +416,9 @@ f.close()
 
 load_fiber_sizes(args.fiber_file,mice)
 if args.ylim != None:
-	m = re.match("([0-9]+),([0-9]+)",args.ylim)
+	m = re.match("([0-9]*\.*[0-9]+),([0-9]*\.*[0-9]+)",args.ylim)
 	if m:
-		args.ylim = (int(m.group(1)),int(m.group(2)))
+		args.ylim = (float(m.group(1)),float(m.group(2)))
 	else:
 		print "problem, y limits need to be specified as <start>,<stop>"
 		print "exiting..."
@@ -425,6 +428,7 @@ if args.ks:
 	compute_ks_test(mice)
 
 if args.random_permute:
+	args.relative = True
 	if not args.bin_sizes:
 		print "must specify histogram bins if going to randomly permute mutant / wild type status (use -bs <bin list>)"
 		print "exiting..."
