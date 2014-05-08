@@ -6,6 +6,7 @@ import copy
 from PIL import Image
 import scipy.ndimage as si
 import scipy.misc
+import bisect
 import numpy as np
 import numpy.random as nr
 import random
@@ -86,6 +87,7 @@ def random_permutation(mice):
 	num_permutations = min(num_combinations,500)
 	wt_hists = []
 	mt_hists = []
+	wt_mt_diffs = []
 	bins = []
 	for i in range(num_permutations):
 		m_copy = copy.deepcopy(mice)
@@ -94,10 +96,21 @@ def random_permutation(mice):
 			m_copy[m][2] = mutant_wildtype[j]
 		#print i
 		wt, mt, bins = permutation_calc(m_copy)
+		diff = []
+		for i,wv in enumerate(wt):
+			diff.append(wv - mt[i])
 		wt_hists.append(wt)
 		mt_hists.append(mt)
+		wt_mt_diffs.append(diff)
+		
+	wt,mt,bins = permutation_calc(mice)
+	percentiles = []
+	for i in range(len(wt)):
+		diffs = [x[i] for x in wt_mt_diffs]
+		diffs.sort()
+		percentiles.append(float(bisect.bisect_right(diffs,wt[i]-mt[i]))/len(diffs))
 	
-	show_histogram(wt_hists, mt_hists, bins)
+	show_histogram([wt], [mt], bins, diff_percentiles=percentiles)
 	
 def permutation_calc(mice_hash):
 	#bootstrap mutant / wild type pooled fibers to get error bars
@@ -107,7 +120,7 @@ def permutation_calc(mice_hash):
 	wild_type = []
 	bins = []
 	if args.bin_sizes:
-		bins = map(int,re.split(",",args.bin_sizes))
+		bins = [int(x) for x in args.bin_sizes.split(",")]
 		hb = len(bins)-1
 	else:
 		print "must specify histogram bins if going to randomly permute mutant / wild type status (use -bs <bin list>)"
@@ -138,7 +151,7 @@ def permutation_calc(mice_hash):
 	return wt_hist, mt_hist, bins
 	
 
-def show_histogram(wt_histograms, mt_histograms, bins):	
+def show_histogram(wt_histograms, mt_histograms, bins, diff_percentiles=None):	
 	wt_hist = np.mean(wt_histograms,axis=0)
 	wt_std = np.std(wt_histograms,axis=0)
 	mt_hist = np.mean(mt_histograms,axis=0)
@@ -165,7 +178,11 @@ def show_histogram(wt_histograms, mt_histograms, bins):
 	for i in range(len(bins)):
 		tick_vals.append(i+1)
 		if i > 0:
-			print "\tbin "+str(i)+": "+str(bins[i-1]*args.conversion)+"-"+str(bins[i]*args.conversion)				
+			if diff_percentiles == None:
+				print "\tbin %d: %f-%f"%(i,bins[i-1]*args.conversion,bins[i]*args.conversion)
+			else:
+				print "\tbin %d: %f-%f\t%f"%(i,bins[i-1]*args.conversion,bins[i]*args.conversion,diff_percentiles[i-1])
+							
 	#for i in range(len(bins)):
 	#	if i < len(bins)-1:
 	#		if not conversion:
@@ -183,7 +200,7 @@ def show_histogram(wt_histograms, mt_histograms, bins):
 	#plt.savefig(hist_name)
 	plt.clf()	
 
-def no_replicates_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
+def no_replicates_histogram(mice_hash,hist_name,hb,user_bins):
 	#bootstrap mutant / wild type pooled fibers to get error bars
 	mt_histograms = []
 	wt_histograms = []
@@ -231,14 +248,12 @@ def no_replicates_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
 				wt_histograms.append(wt_hist)
 				mt_hist, tmpbins = np.histogram(mt_sample,bins)
 				mt_histograms.append(mt_hist)	
-	
-	if permutation == 1:
-		return wt_histograms, mt_histograms, bins  						
+						
 	show_histogram(wt_histograms, mt_histograms, bins)
 		
 
 
-def compile_rf_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
+def compile_rf_histogram(mice_hash,hist_name,hb,user_bins):
 	#do permutations to get all possibilities and then let the final histogram be the average
 	image_names = []
 	mt_histograms = []
@@ -285,13 +300,11 @@ def compile_rf_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
 			mt_hist, tmpbins = np.histogram(mutant,bins)
 			mt_relfreq = mt_hist/float(sum(mt_hist))
 			mt_histograms.append(mt_relfreq)
-	
-	if permutation == 1:
-		return wt_histograms, mt_histograms, bins 			
+	 			
 	show_histogram(wt_histograms, mt_histograms, bins)
 	#print np.matrix(wt_histograms)
 
-def compile_count_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
+def compile_count_histogram(mice_hash,hist_name,hb,user_bins):
 	#do permutations to get all possibilities and then let the final histogram be the average
 	image_names = []
 	mt_histograms = []
@@ -361,8 +374,7 @@ def compile_count_histogram(mice_hash,hist_name,hb,user_bins,permutation=0):
 			wt_histograms.append(wt_hist)
 			mt_hist, tmpbins = np.histogram(mutant,bins)
 			mt_histograms.append(mt_hist)	
-	if permutation == 1:
-		return wt_histograms, mt_histograms, bins
+
 	show_histogram(wt_histograms, mt_histograms, bins)		
 
 
@@ -428,7 +440,6 @@ if args.ks:
 	compute_ks_test(mice)
 
 if args.random_permute:
-	args.relative = True
 	if not args.bin_sizes:
 		print "must specify histogram bins if going to randomly permute mutant / wild type status (use -bs <bin list>)"
 		print "exiting..."
