@@ -15,7 +15,8 @@ class analyze_slow:
 		#tmp = Image.new("L",im_co.size)
 		#tmp.putdata(thresholded_copix)
 		#tmp.show()
-		self.sizes = self.quantify_fibers(args, vis_pix, thresholded_copix, im_co, rgb_pix)		
+		#self.sizes = self.quantify_fibers(args, vis_pix, thresholded_copix, im_co, rgb_pix)		
+		self.sizes = self.quantify_fibers2(args, vis_pix, thresholded_copix, im_co, rgb_pix)		
 						
 				
 	def global_threshold(self, im_co, vis_pix, args): #do global thresholding to isolate slow fibers
@@ -30,10 +31,15 @@ class analyze_slow:
 		
 	def quantify_fibers(self, args, vis_pix, thresholded_copix, im_co, rgb_pix): #label feature with number (2)
 		co_labeled_array, co_num_features = si.label(thresholded_copix.reshape(im_co.size[1],im_co.size[0]),structure=[[1,1,1],[1,1,1],[1,1,1]])
+		#im = Image.new("L", im_co.size)
+		#im.putdata(thresholded_copix.flatten())
+		#im.show()
 		together_labeled_array = co_labeled_array.flatten()*(co_labeled_array.flatten() > 0)
 		co_label_hist = si.measurements.histogram(together_labeled_array,1,np.max(together_labeled_array),np.max(together_labeled_array))
 		condition = (co_label_hist > args.min_fiber_size) & (co_label_hist < args.max_fiber_size)
 		co_fiber_sizes = co_label_hist[condition]
+		#print co_fiber_sizes
+		#print len(co_fiber_sizes)
 		co_fiber_labels = np.arange(1,np.max(together_labeled_array)+1)[condition]
 		colocated_hash = dict.fromkeys(co_fiber_labels,0)
 		for index,i in enumerate(co_labeled_array.flatten()):
@@ -42,4 +48,19 @@ class analyze_slow:
 				rgb_pix[index] = (255, 255, 0)
 		return co_fiber_sizes
 		
-	
+	def quantify_fibers2(self, args, vis_pix, thresholded_copix, im_co, rgb_pix): #label feature with number (2)
+		vis_pix_matrix = vis_pix.reshape(im_co.size[1],im_co.size[0])
+		all_array, num_features = si.label(vis_pix_matrix,structure=[[1,1,1],[1,1,1],[1,1,1]])
+		co_fiber_sizes = []
+		for fiber_slice in si.find_objects(all_array):
+			fiber_pix = thresholded_copix[fiber_slice].flatten()
+			if float(np.sum(fiber_pix))/float(fiber_pix.size) > .3: #if > 30% of the pixels are colocalized call entire fiber slow
+				co_fiber_sizes.append(fiber_pix.size)
+				for i in xrange(fiber_slice[0].start,fiber_slice[0].stop):
+					for j in xrange(fiber_slice[1].start,fiber_slice[1].stop):
+						if vis_pix_matrix[i][j] == 1:
+							vis_pix_matrix[i][j] = 2
+							rgb_pix[i*im_co.size[0] + j] = (255, 255, 0)
+		vis_pix = vis_pix_matrix.flatten()
+		return np.array(co_fiber_sizes)
+						

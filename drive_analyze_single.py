@@ -11,6 +11,7 @@ import re
 import os
 import sys
 import time
+import copy
 import argparse
 
 #command line parsing 
@@ -56,7 +57,7 @@ if im_rgb.mode != "RGB":
 	print "Image needs to be an RGB, this is not.  Going to skip image " + tmp_img
 	sys.exit(0)
 rgb_pix = im_rgb.getdata()
-vis_rgb = list(rgb_pix)
+vis_rgb = copy.deepcopy(list(rgb_pix))
 bit_pix = []
 for p in rgb_pix:
 	bit_pix.append(p[channel])
@@ -108,22 +109,29 @@ if args.save:
 
 fiber_sizes = []
 num_fast, num_slow = 0, 0
+fast_fibers = all.sizes
 if slow:
 	fiber_sizes.extend(slow.sizes)
-	num_fast = len(all.sizes)
+	num_fast = len(fast_fibers)
 	num_slow = len(slow.sizes)
 fiber_sizes.extend(all.sizes)
 fiber_number = len(fiber_sizes)
 mean_fiber = np.mean(fiber_sizes)
-fiber_variance = np.var(fiber_sizes)
+fiber_std = np.std(fiber_sizes)
 fiber_area = sum(fiber_sizes)
 subtracted_area = im.size[0]*im.size[1] - fiber_area
 if main_structure_area > 0:
 	subtracted_area = main_structure_area - fiber_area
-	
-print "number of fibers: " + str(fiber_number)
-print "mean fiber size: " + str(mean_fiber)
-print "fiber size variance: " + str(fiber_variance)
+print "total number of fibers: " + str(fiber_number)
+if slow:
+	print "number of slow fibers: %d"%(num_slow)
+	print "number of fast fibers: %d"%(num_fast)
+	print "mean and standard deviation of size of slow fibers: %f\t%f"%(np.mean(slow.sizes),np.std(slow.sizes))
+	print "mean and standard deviation of size of fast fibers: %f\t%f"%(np.mean(fast_fibers),np.std(fast_fibers))
+else:
+	print "mean fiber size: " + str(mean_fiber)
+	print "fiber size standard deviation: " + str(fiber_std)
+
 print "total fiber area: " + str(fiber_area)
 print "between fiber area: " + str(subtracted_area)
 
