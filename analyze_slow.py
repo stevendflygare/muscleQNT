@@ -6,6 +6,7 @@ import scipy.ndimage as si
 import scipy.spatial as sp
 import argparse
 import mahotas as mh
+import collections
 
 
 class analyze_slow:
@@ -53,14 +54,30 @@ class analyze_slow:
 		all_array, num_features = si.label(vis_pix_matrix,structure=[[1,1,1],[1,1,1],[1,1,1]])
 		co_fiber_sizes = []
 		for fiber_slice in si.find_objects(all_array):
-			fiber_pix = thresholded_copix[fiber_slice].flatten()
+			fiber_pix = (thresholded_copix[fiber_slice].flatten()) > 0
+			fiber_types = collections.Counter(all_array[fiber_slice].flatten())
+			max_type = None
+			if len(fiber_types) > 2:
+				max_count = 0
+				for ft in fiber_types:
+					if ft > 0 and fiber_types[ft] > max_count:
+						max_type = ft
+						max_count = fiber_types[ft]
 			if float(np.sum(fiber_pix))/float(fiber_pix.size) > .3: #if > 30% of the pixels are colocalized call entire fiber slow
-				co_fiber_sizes.append(fiber_pix.size)
+				slow_fiber_size = 0
 				for i in xrange(fiber_slice[0].start,fiber_slice[0].stop):
 					for j in xrange(fiber_slice[1].start,fiber_slice[1].stop):
 						if vis_pix_matrix[i][j] == 1:
-							vis_pix_matrix[i][j] = 2
-							rgb_pix[i*im_co.size[0] + j] = (255, 255, 0)
+							if max_type:
+								if all_array[i][j] == max_type:
+									vis_pix_matrix[i][j] = 2
+									rgb_pix[i*im_co.size[0] + j] = (255, 255, 0)
+									slow_fiber_size += 1
+							else:
+								vis_pix_matrix[i][j] = 2
+								rgb_pix[i*im_co.size[0] + j] = (255, 255, 0)
+								slow_fiber_size += 1
+				co_fiber_sizes.append(slow_fiber_size)				
 		vis_pix = vis_pix_matrix.flatten()
 		return np.array(co_fiber_sizes)
 						
